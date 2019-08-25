@@ -1,125 +1,100 @@
-//  OpenShift sample Node application
-var express = require('express'),
-    app     = express(),
-    morgan  = require('morgan');
-    
-Object.assign=require('object-assign')
+const mongo = require('mongoose');
 
-app.engine('html', require('ejs').renderFile);
-app.use(morgan('combined'))
+// Need Clarification
+const express = require('express');
+var app = express();
 
-var port = process.env.PORT || process.env.OPENSHIFT_NODEJS_PORT || 8080,
-    ip   = process.env.IP   || process.env.OPENSHIFT_NODEJS_IP || '0.0.0.0',
-    mongoURL = process.env.OPENSHIFT_MONGODB_DB_URL || process.env.MONGO_URL,
-    mongoURLLabel = "";
+// avoid the warning in the console
+const options = { useNewUrlParser: true };
 
-if (mongoURL == null) {
-  var mongoHost, mongoPort, mongoDatabase, mongoPassword, mongoUser;
-  // If using plane old env vars via service discovery
-  if (process.env.DATABASE_SERVICE_NAME) {
-    var mongoServiceName = process.env.DATABASE_SERVICE_NAME.toUpperCase();
-    mongoHost = process.env[mongoServiceName + '_SERVICE_HOST'];
-    mongoPort = process.env[mongoServiceName + '_SERVICE_PORT'];
-    mongoDatabase = process.env[mongoServiceName + '_DATABASE'];
-    mongoPassword = process.env[mongoServiceName + '_PASSWORD'];
-    mongoUser = process.env[mongoServiceName + '_USER'];
+// Allow for cross access control while try to access from UI.
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
 
-  // If using env vars from secret from service binding  
-  } else if (process.env.database_name) {
-    mongoDatabase = process.env.database_name;
-    mongoPassword = process.env.password;
-    mongoUser = process.env.username;
-    var mongoUriParts = process.env.uri && process.env.uri.split("//");
-    if (mongoUriParts.length == 2) {
-      mongoUriParts = mongoUriParts[1].split(":");
-      if (mongoUriParts && mongoUriParts.length == 2) {
-        mongoHost = mongoUriParts[0];
-        mongoPort = mongoUriParts[1];
-      }
+const getValueSchema =  mongo.Schema(
+    {  
+        "name":String,
+        "number":Number
+    },
+    {
+        collection:"Demo_Collection1",
     }
-  }
+);
+const getValueModel = mongo.model('Demo_Collection1', getValueSchema);
 
-  if (mongoHost && mongoPort && mongoDatabase) {
-    mongoURLLabel = mongoURL = 'mongodb://';
-    if (mongoUser && mongoPassword) {
-      mongoURL += mongoUser + ':' + mongoPassword + '@';
-    }
-    // Provide UI label that excludes user id and pw
-    mongoURLLabel += mongoHost + ':' + mongoPort + '/' + mongoDatabase;
-    mongoURL += mongoHost + ':' +  mongoPort + '/' + mongoDatabase;
-  }
-}
-var db = null,
-    dbDetails = new Object();
+// var savedata = new getValueModel ({
+//     name : "Selva",
+//     number :  9787878315
+// });
+// savedata.save();
 
-var initDb = function(callback) {
-  if (mongoURL == null) return;
-
-  var mongodb = require('mongodb');
-  if (mongodb == null) return;
-
-  mongodb.connect(mongoURL, function(err, conn) {
-    if (err) {
-      callback(err);
-      return;
-    }
-
-    db = conn;
-    dbDetails.databaseName = db.databaseName;
-    dbDetails.url = mongoURLLabel;
-    dbDetails.type = 'MongoDB';
-
-    console.log('Connected to MongoDB at: %s', mongoURL);
-  });
-};
-
-app.get('/', function (req, res) {
-  // try to initialize the db on every request if it's not already
-  // initialized.
-  if (!db) {
-    initDb(function(err){});
-  }
-  if (db) {
-    var col = db.collection('counts');
-    // Create a document with request IP and current time of request
-    col.insert({ip: req.ip, date: Date.now()});
-    col.count(function(err, count){
-      if (err) {
-        console.log('Error running count. Message:\n'+err);
-      }
-      res.render('index.html', { pageCountMessage : count, dbInfo: dbDetails });
+app.get('/api/website/:name', function(req,res){
+    var website = new getValueModel({name: req.params.name, number: 9787878315});
+    website.save(function(err,doc)
+    {
+        res.json(doc);
     });
-  } else {
-    res.render('index.html', { pageCountMessage : null});
-  }
+})
+
+app.get('/data', (req, res) => {
+    getValueModel.find({},function(err, data) {
+        if(err){
+            console.log(err);
+            return res.send(err);
+        }
+        return res.send(data);
+        // getValueModel.find().exec(function(error, Demo_Collection) { return res.send(Demo_Collection); 
+    })
 });
 
-app.get('/pagecount', function (req, res) {
-  // try to initialize the db on every request if it's not already
-  // initialized.
-  if (!db) {
-    initDb(function(err){});
-  }
-  if (db) {
-    db.collection('counts').count(function(err, count ){
-      res.send('{ pageCount: ' + count + '}');
-    });
-  } else {
-    res.send('{ pageCount: -1 }');
-  }
+var developer = [
+    {
+        first: 'Selva', last: 'Kumar'
+    },
+    {
+       first: 'Selva1', last: 'Kumar1'
+    }
+   ]
+   app.get('/developer', function(req,res){
+       res.json(developer);
+   });
+
+app.get('/gett', (req, res) => {
+        getValueModel.find({
+            name : "Narco", number : "12"
+        }, function(err, Demo_Collection){
+            if(err) throw err;
+            {
+                console.log(err);
+                if(Demo_Collection.length === 1){  
+                    return res.status(200).json({
+                        status: 'success',
+                        data: Demo_Collection
+                    })
+                } else {
+                    console.log(err);
+                    return res.status(200).json({
+                        status: 'fail get',
+                        message: 'Login Failed get'
+                    })
+                }
+            }
+        })
+})
+
+mongo.connect("mongodb://localhost:27017/DemoDB", options)
+    .then((response , err) => {
+        if(response){
+            // console.log(response);
+            // console.log("Successfully connected to the database1");
+        }
+        console.log("Successfully connected to the database");
+    })
+    var ip = process.env.OPENSHIFT_NODEJS_IP || '127.0.0.1';
+    var port = process.env.OPENSHIFT_NODEJS_PORT || 8800 ;
+app.listen((ip,port), () => {
+    console.log("Server is listening on port");
 });
-
-// error handling
-app.use(function(err, req, res, next){
-  console.error(err.stack);
-  res.status(500).send('Something bad happened!');
-});
-
-initDb(function(err){
-  console.log('Error connecting to Mongo. Message:\n'+err);
-});
-
-app.listen(port, ip);
-console.log('Server running on http://%s:%s', ip, port);
-
-module.exports = app ;
